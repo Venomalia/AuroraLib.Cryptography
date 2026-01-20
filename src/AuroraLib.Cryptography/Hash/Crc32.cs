@@ -3,6 +3,9 @@ using AuroraLib.Interfaces;
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+#if NET6_0_OR_GREATER
+using System.Runtime.Intrinsics.X86;
+#endif
 
 namespace AuroraLib.Cryptography.Hash
 {
@@ -22,6 +25,9 @@ namespace AuroraLib.Cryptography.Hash
         private readonly uint _xorOut;
         private readonly bool _reverse;
         private readonly uint[] _table;
+#if NET6_0_OR_GREATER
+        private readonly bool _is_nativ_crc32c;
+#endif
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Crc32"/> class.
@@ -36,6 +42,15 @@ namespace AuroraLib.Cryptography.Hash
             _init = initial;
             _value = initial;
             _reverse = reverse;
+
+#if NET6_0_OR_GREATER
+            _is_nativ_crc32c = polynomial == Crc32Algorithm.CRC32C.Polynomial() && reverse == Crc32Algorithm.CRC32C.Reverse() && Sse42.IsSupported;
+
+            if (!_is_nativ_crc32c)
+            {
+                _table = Crc32TableCache.GetOrCreate(polynomial, reverse);
+            }
+#else
             _table = Crc32TableCache.GetOrCreate(polynomial, reverse);
         }
 
@@ -59,20 +74,39 @@ namespace AuroraLib.Cryptography.Hash
         /// <inheritdoc />
         public void Compute(ReadOnlySpan<byte> input)
         {
-            if (_reverse)
+            uint crc = _value;
+#if NET6_0_OR_GREATER
+            if (_is_nativ_crc32c)
             {
-                foreach (byte b in input)
+                if (input.Length >= 4)
                 {
-                    _value = _table[(byte)(_value >> 24 & 0xFF ^ b)] ^ _value << 8;
+                    var ints = MemoryMarshal.Cast<byte, uint>(input);
+                    foreach (var i in ints)
+                        crc = Sse42.Crc32(crc, i);
+                    input = input[(ints.Length * 4)..];
                 }
+                foreach (byte b in input)
+                    crc = Sse42.Crc32(crc, b);
             }
             else
+#endif
             {
-                foreach (byte b in input)
+                if (_reverse)
                 {
-                    _value = _value >> 8 ^ _table[_value & 0xff ^ b];
+                    foreach (byte b in input)
+                    {
+                        crc = (crc << 8) ^ _table[((crc >> 24) ^ b) & 0xFF];
+                    }
+                }
+                else
+                {
+                    foreach (byte b in input)
+                    {
+                        crc = (crc >> 8) ^ _table[(crc ^ b) & 0xFF];
+                    }
                 }
             }
+            _value = crc;
         }
 
         /// <inheritdoc />

@@ -32,11 +32,11 @@ namespace AuroraLib.Cryptography.Hash
         /// <param name="xorOut">The XOR output value for the CRC calculation.</param>
         public Crc32(uint polynomial, bool reverse = false, uint initial = uint.MaxValue, uint xorOut = uint.MaxValue)
         {
-            _table = InitializeTable(polynomial, reverse);
             _xorOut = xorOut;
             _init = initial;
             _value = initial;
             _reverse = reverse;
+            _table = Crc32TableCache.GetOrCreate(polynomial, reverse);
         }
 
         /// <summary>
@@ -96,45 +96,5 @@ namespace AuroraLib.Cryptography.Hash
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetSeed(uint seed)
             => _value = seed;
-
-        private static uint[] InitializeTable(uint polynomial, bool reverse)
-        {
-            uint[] polynomialTable = new uint[256];
-            if (reverse)
-            {
-                for (uint i = 0; i < 256; i++)
-                {
-                    uint entry;
-                    entry = i << 24;
-                    for (int j = 8 - 1; j >= 0; j--)
-                    {
-                        if ((entry & 0x80000000) != 0)
-                            entry = entry << 1 ^ polynomial;
-                        else
-                            entry <<= 1;
-                    }
-                    polynomialTable[i] = entry;
-                }
-                return polynomialTable;
-            }
-            else
-            {
-                polynomial = BitConverterX.SwapBits(ref polynomial);
-                for (uint i = 0; i < 256; i++)
-                {
-                    uint entry;
-                    entry = i;
-                    for (int j = 0; j < 8; j++)
-                    {
-                        if ((entry & 1) == 1)
-                            entry = entry >> 1 ^ polynomial;
-                        else
-                            entry >>= 1;
-                    }
-                    polynomialTable[i] = entry;
-                }
-                return polynomialTable;
-            }
-        }
     }
 }

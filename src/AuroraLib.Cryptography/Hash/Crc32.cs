@@ -1,4 +1,4 @@
-﻿using AuroraLib.Cryptography.Helper;
+using AuroraLib.Cryptography.Helper;
 using AuroraLib.Interfaces;
 using System;
 using System.Runtime.CompilerServices;
@@ -23,7 +23,7 @@ namespace AuroraLib.Cryptography.Hash
 
         private readonly uint _init;
         private readonly uint _xorOut;
-        private readonly bool _reverse;
+        private readonly bool _reflected;
         private readonly uint[] _table;
 #if NET6_0_OR_GREATER
         private readonly bool _is_nativ_crc32c;
@@ -33,25 +33,24 @@ namespace AuroraLib.Cryptography.Hash
         /// Initializes a new instance of the <see cref="Crc32"/> class.
         /// </summary>
         /// <param name="polynomial">The polynomial used for CRC calculation.</param>
-        /// <param name="reverse">Use reverse calculation.</param>
+        /// <param name="reflected">Use reflected calculation.</param>
         /// <param name="initial">The initial value for the CRC calculation.</param>
         /// <param name="xorOut">The XOR output value for the CRC calculation.</param>
-        public Crc32(uint polynomial, bool reverse = false, uint initial = uint.MaxValue, uint xorOut = uint.MaxValue)
+        public Crc32(uint polynomial, bool reflected = false, uint initial = uint.MaxValue, uint xorOut = uint.MaxValue)
         {
-            _xorOut = xorOut;
+            _reflected = reflected;
             _init = initial;
             _value = initial;
-            _reverse = reverse;
+            _xorOut = xorOut;
 
 #if NET6_0_OR_GREATER
-            _is_nativ_crc32c = polynomial == Crc32Algorithm.CRC32C.Polynomial() && reverse == Crc32Algorithm.CRC32C.Reverse() && Sse42.IsSupported;
+            _is_nativ_crc32c = polynomial == Crc32Algorithm.CRC32C.Polynomial() && reflected == Crc32Algorithm.CRC32C.Reverse() && Sse42.IsSupported;
 
             if (!_is_nativ_crc32c)
-            {
-                _table = Crc32TableCache.GetOrCreate(polynomial, reverse);
-            }
+                _table = Crc32TableCache.GetOrCreate(polynomial, reflected);
 #else
-            _table = Crc32TableCache.GetOrCreate(polynomial, reverse);
+            _table = Crc32TableCache.GetOrCreate(polynomial, reflected);
+#endif
         }
 
         /// <summary>
@@ -91,7 +90,7 @@ namespace AuroraLib.Cryptography.Hash
             else
 #endif
             {
-                if (_reverse)
+                if (_reflected)
                 {
                     foreach (byte b in input)
                     {
@@ -117,8 +116,8 @@ namespace AuroraLib.Cryptography.Hash
         /// <inheritdoc />
         public void Write(Span<byte> destination)
         {
-            uint vaule = Value;
-            MemoryMarshal.Write(destination, ref vaule);
+            uint value = Value;
+            MemoryMarshal.Write(destination, ref value);
         }
 
         /// <inheritdoc />

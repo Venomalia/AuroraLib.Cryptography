@@ -5,18 +5,18 @@ namespace AuroraLib.Cryptography.Hash
 {
     internal static class Crc32TableCache
     {
-        private static readonly Dictionary<(uint Polynomial, bool Reverse), uint[]> _table_cache = new Dictionary<(uint Polynomial, bool Reverse), uint[]>();
+        private static readonly Dictionary<(uint Polynomial, bool Reflected), uint[]> _table_cache = new Dictionary<(uint, bool), uint[]>();
 
-        public static uint[] GetOrCreate(uint polynomial, bool reverse)
+        public static uint[] GetOrCreate(uint polynomial, bool reflected)
         {
-            var key = (polynomial, reverse);
+            var key = (polynomial, reflected);
 
             lock (_table_cache)
             {
                 if (_table_cache.TryGetValue(key, out var table))
                     return table;
 
-                table = InitializeTable(polynomial, reverse);
+                table = InitializeTable(polynomial, reflected);
                 _table_cache[key] = table;
                 return table;
             }
